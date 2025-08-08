@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no" />
   <title>横スクロール・アクション</title>
   <style>
     :root {
@@ -38,7 +38,7 @@
     .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
     button.primary { pointer-events:auto; appearance:none; border:none; border-radius:12px; padding:12px 16px; font-weight:800; letter-spacing:.03em; background:linear-gradient(180deg, var(--accent), #f1a90b); color:#2b1c00; box-shadow:0 6px 0 #b57602; cursor:pointer; }
     button.primary:active { transform: translateY(2px); box-shadow:0 4px 0 #b57602; }
-    button.ghost { pointer-events:auto; background:transparent; border:1px solid rgba(255,255,255,.2); color:#fff; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer; }
+    button.ghost { pointer-events:auto; background:transparent; border:1px solid rgba(255,255,255,.2); color:var(--fg); border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer; }
     .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background:rgba(255,255,255,.08); padding:2px 6px; border-radius:6px; border:1px solid rgba(255,255,255,.15); }
 
     /* カウントダウンの視認性 */
@@ -422,6 +422,10 @@
   ['gesturestart','gesturechange','gestureend'].forEach(type=>{
     window.addEventListener(type, (e)=>{ e.preventDefault(); }, { passive:false });
   });
+  // 2本指ピンチ対策（保険）
+  window.addEventListener('touchstart', (e)=>{ if(e.touches && e.touches.length>1){ e.preventDefault(); } }, { passive:false });
+  // ダブルタップズーム対策（300ms以内の連続tapを無効化）
+  (function(){ let lastTouchEnd = 0; document.addEventListener('touchend', (e)=>{ const now = Date.now(); if(now - lastTouchEnd <= 350){ e.preventDefault(); } lastTouchEnd = now; }, { passive:false }); })();
   window.addEventListener('dblclick', (e)=>{ e.preventDefault(); }, { passive:false });
 
   // 初期はメニュー表示＆UIへフォーカス可
