@@ -226,11 +226,14 @@
 
   // ========================= Mechanics =========================
   let time = 0;
-  let countdownEndsAt = 0; // ms timestamp
+  let countUntil = 0; // カウント(3,2,1)が終わる時刻
+  let goUntil = 0;   // 「GO!」を消す時刻
+  let goFallbackTimer = null; // 最終手段の強制消去タイマー
   let goToMenuTimer = null; // GAME OVER後にメニューへ戻すタイマーID
   function startGame(){
     // PLAY直後は中央の半透明ボックスを必ず消す
     if(goToMenuTimer){ clearTimeout(goToMenuTimer); goToMenuTimer = null; }
+    if(goFallbackTimer){ clearTimeout(goFallbackTimer); goFallbackTimer = null; }
     overlay.hidden = true; overlay.style.display = 'none';
     player.reset(); resetWorld();
     setUIFocusable(false);
@@ -272,36 +275,47 @@
     // カウントダウン中もoverlayは非表示のまま
     overlay.hidden = true; overlay.style.display='none';
     state = STATE.COUNTDOWN;
-    countdownEndsAt = performance.now() + (sec*1000) + 600; // +GO!表示
-    cd.hidden = false; cdLabel.textContent = String(sec);
-  }
-
-  function updateCountdownLabel(){
     const now = performance.now();
-    const remain = countdownEndsAt - now;
-    if(remain <= 0){ cdLabel.textContent = 'GO!'; setTimeout(()=>{ cd.hidden=true; state=STATE.PLAY; setUIFocusable(false); }, 400); return; }
-    const n = Math.ceil((remain-600)/1000); // 600msはGO!分
-    cdLabel.textContent = Math.max(1,n);
-    // 次のフレームで更新（描画ループでも上書きされるが念のため）
-    requestAnimationFrame(updateCountdownLabel);
+    countUntil = now + (sec*1000); // 3,2,1 の終了時刻
+    goUntil = 0; // まだ未設定
+    cd.hidden = false; cd.style.display = 'grid'; cdLabel.textContent = String(sec);
+
+    // ★フェイルセーフ：端末によるRAF停止でも必ず消えるように総時間で強制OFF
+    if(goFallbackTimer){ clearTimeout(goFallbackTimer); }
+    goFallbackTimer = setTimeout(()=>{
+      if(state===STATE.COUNTDOWN){ cd.hidden = true; cd.style.display='none'; state = STATE.PLAY; setUIFocusable(false); }
+      goFallbackTimer = null;
+    }, sec*1000 + 800 + 200); // 数字のあとGO!0.8s + 余裕200ms
   }
 
-  let prevX=0, prevY=0; // 前フレーム位置
+    let prevX=0, prevY=0; // 前フレーム位置
 
   function update(){
     pollInput();
 
-    // ===== COUNTDOWN: ラベル更新と終了判定（スマホでも確実に消す）
+    // ===== COUNTDOWN: 数字→GO!→消す、を確実に進める（スマホでもOK）
     if(state===STATE.COUNTDOWN){
-      const remain = countdownEndsAt - performance.now();
-      if(remain <= 0){
-        cd.hidden = true;
-        state = STATE.PLAY;
-        setUIFocusable(false);
+      const now = performance.now();
+      if(goUntil){
+        // GO! フェーズ
+        cdLabel.textContent = 'GO!';
+        if(now >= goUntil){
+          cd.hidden = true; // 必ず消す
+          cd.style.display = 'none';
+          state = STATE.PLAY;
+          setUIFocusable(false);
+        }
       } else {
-        cdLabel.textContent = (remain <= 600) ? 'GO!' : Math.max(1, Math.ceil((remain-600)/1000));
+        const remain = countUntil - now;
+        if(remain <= 0){
+          // 数字カウント終了 → GO! を 0.8s 表示
+          goUntil = now + 800; // 800ms後に消える
+          cdLabel.textContent = 'GO!';
+        } else {
+          cdLabel.textContent = Math.max(1, Math.ceil(remain/1000));
+        }
       }
-      // 軽い背景スクロールだけ続ける
+      // 演出としてバックグラウンドはゆっくり流す
       shiftWorld(Math.max(0, worldSpeed*0.5));
       return;
     }
@@ -426,6 +440,13 @@
   let last=0; let accumulator=0, step=1/60;
   function loop(ts){ const dt=Math.min(1/30,(ts-last)/1000||0); last=ts; accumulator+=dt; while(accumulator>=step){ update(); accumulator-=step; } draw(); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
+
+  // タブ切替等でRAFが止まってもGO!を確実に消す
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible' && state===STATE.COUNTDOWN && goUntil){
+      if(performance.now() >= goUntil){ cd.hidden = true; cd.style.display='none'; state = STATE.PLAY; setUIFocusable(false); }
+    }
+  });
 
   // iOS系のピンチイン/ダブルタップズームを明示的に無効化
   ['gesturestart','gesturechange','gestureend'].forEach(type=>{
