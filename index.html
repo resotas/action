@@ -2,21 +2,21 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>横スクロール・アクション</title>
   <style>
     :root {
       --bg:#0b1020; --fg:#e6e6e6; --accent:#ffd54a; --accent2:#64d8ff; --danger:#ff6b6b; --success:#7cf07c;
       --controlArea: 160px; /* モバイルのコントローラー占有高さ */
     }
-    html, body { height:100%; margin:0; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif; touch-action:none; overscroll-behavior:none; }
     #wrap { display:grid; place-items:center; min-height:100%; padding:0 0 var(--controlArea); box-sizing:border-box; }
 
     #ui { position:fixed; top:12px; left:12px; right:12px; display:flex; gap:12px; align-items:center; justify-content:space-between; pointer-events:none; z-index:3; }
     .hud { display:flex; gap:16px; font-weight:700; text-shadow:0 2px 0 rgba(0,0,0,.35); }
     .chip { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:10px; }
 
-    canvas { width:min(100vw, 1200px); height:min(100vh - var(--controlArea), 700px); border-radius:18px; box-shadow:0 30px 80px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.08); background:linear-gradient(#0b1020,#0b1428 15%, #0b1630); }
+    canvas { $1 touch-action:none; }
 
     /* 画面下のコントローラーは Canvas の外側（下）に配置し、ゲームの当たり判定に関与しない */
     #buttons { position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:space-between; padding:10px 16px; gap:8px; pointer-events:none; z-index:4; }
@@ -264,7 +264,7 @@
     overlay.hidden = true; overlay.style.display='none';
     state = STATE.COUNTDOWN;
     countdownEndsAt = performance.now() + (sec*1000) + 600; // +GO!表示
-    cd.hidden = false; updateCountdownLabel();
+    cd.hidden = false; cdLabel.textContent = String(sec);
   }
 
   function updateCountdownLabel(){
@@ -281,6 +281,22 @@
 
   function update(){
     pollInput();
+
+    // ===== COUNTDOWN: ラベル更新と終了判定（スマホでも確実に消す）
+    if(state===STATE.COUNTDOWN){
+      const remain = countdownEndsAt - performance.now();
+      if(remain <= 0){
+        cd.hidden = true;
+        state = STATE.PLAY;
+        setUIFocusable(false);
+      } else {
+        cdLabel.textContent = (remain <= 600) ? 'GO!' : Math.max(1, Math.ceil((remain-600)/1000));
+      }
+      // 軽い背景スクロールだけ続ける
+      shiftWorld(Math.max(0, worldSpeed*0.5));
+      return;
+    }
+
     if(state===STATE.PAUSE || state===STATE.MENU || state===STATE.GAMEOVER) return;
 
     time += 1/60; worldSpeed += 0.0008;
@@ -401,6 +417,12 @@
   let last=0; let accumulator=0, step=1/60;
   function loop(ts){ const dt=Math.min(1/30,(ts-last)/1000||0); last=ts; accumulator+=dt; while(accumulator>=step){ update(); accumulator-=step; } draw(); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
+
+  // iOS系のピンチイン/ダブルタップズームを明示的に無効化
+  ['gesturestart','gesturechange','gestureend'].forEach(type=>{
+    window.addEventListener(type, (e)=>{ e.preventDefault(); }, { passive:false });
+  });
+  window.addEventListener('dblclick', (e)=>{ e.preventDefault(); }, { passive:false });
 
   // 初期はメニュー表示＆UIへフォーカス可
   overlay.hidden=false;
