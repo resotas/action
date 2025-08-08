@@ -43,6 +43,8 @@
 
     /* カウントダウンの視認性 */
     .countdown { position:fixed; inset:0; display:grid; place-items:center; pointer-events:none; z-index:4; }
+    * { -webkit-tap-highlight-color: transparent; }
+    button, .btnpad { touch-action: manipulation; }
   </style>
 </head>
 <body>
@@ -453,10 +455,28 @@
     window.addEventListener(type, (e)=>{ e.preventDefault(); }, { passive:false });
   });
   // 2本指ピンチ対策（保険）
-  window.addEventListener('touchstart', (e)=>{ if(e.touches && e.touches.length>1){ e.preventDefault(); } }, { passive:false });
-  // ダブルタップズーム対策（300ms以内の連続tapを無効化）
-  (function(){ let lastTouchEnd = 0; document.addEventListener('touchend', (e)=>{ const now = Date.now(); if(now - lastTouchEnd <= 350){ e.preventDefault(); } lastTouchEnd = now; }, { passive:false }); })();
-  window.addEventListener('dblclick', (e)=>{ e.preventDefault(); }, { passive:false });
+  window.addEventListener('touchstart', (e)=>{
+    if(e.touches && e.touches.length>1){ e.preventDefault(); }
+  }, { passive:false });
+  // ダブルタップズーム対策（連続tapを無効化 + dblclick無効化）
+  (function(){
+    let lastTouchStart = 0;
+    let lastTouchEnd = 0;
+    const threshold = 500; // 500ms以内はダブルタップ扱い
+    document.addEventListener('touchstart', (e)=>{
+      const now = Date.now();
+      if(now - lastTouchStart <= threshold){ e.preventDefault(); }
+      lastTouchStart = now;
+    }, { passive:false, capture:true });
+    document.addEventListener('touchend', (e)=>{
+      const now = Date.now();
+      if(now - lastTouchEnd <= threshold){ e.preventDefault(); }
+      lastTouchEnd = now;
+    }, { passive:false, capture:true });
+  })();
+  // クリックの多重（detail>1）も抑止（Android系ブラウザの保険）
+  document.addEventListener('click', (e)=>{ if(e.detail>1){ e.preventDefault(); e.stopPropagation(); } }, true);
+  window.addEventListener('dblclick', (e)=>{ e.preventDefault(); e.stopPropagation(); }, { passive:false, capture:true });
 
   // 初期はメニュー表示＆UIへフォーカス可
   overlay.hidden=false;
