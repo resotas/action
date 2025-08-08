@@ -131,6 +131,7 @@
   const MAX_SPEED_X = 6.5;
   const JUMP_VELOCITY = -12.2;
   const WORLD_SPEED_START = 3.2;
+  const IS_MOBILE = matchMedia('(pointer: coarse)').matches || /Mobi|Android/i.test(navigator.userAgent);
 
   const STATE = { MENU:0, PLAY:1, PAUSE:2, GAMEOVER:3, COUNTDOWN:4 };
   let state = STATE.MENU;
@@ -170,6 +171,8 @@
     const baseY = H()-100; let x= -200;
     for(let i=0;i<12;i++){ const w=300; platforms.push(new Platform(x, baseY, w)); x+=w; }
     for(let i=0;i<12;i++) spawnChunk();
+    // スマホで「敵が来ない」体感を避けるため、開始直後に必ず1体出す
+    spawnStarterEnemy();
   }
 
   function spawnChunk(){
@@ -178,7 +181,13 @@
     platforms.push(new Platform(farX + gap, y, w));
     const topY = y - 26; const coinCount = irand(0,4);
     for(let i=0;i<coinCount;i++){ coins.push(new Coin(farX + gap + irand(20, w-20), topY - irand(20, 80))); }
-    if(Math.random()<0.4){ enemies.push(new Enemy(farX + gap + irand(20, w-40), y-6)); }
+    const enemyProb = IS_MOBILE ? 0.7 : 0.4; // モバイルは出現率アップ
+    if(Math.random()<enemyProb){ enemies.push(new Enemy(farX + gap + irand(20, Math.max(20,w-40)), y-6)); }
+  }
+
+  function spawnStarterEnemy(){
+    const p = platforms.find(pl => pl.x>200 && pl.x<900);
+    if(p){ enemies.push(new Enemy(p.x + Math.min(160, Math.max(40, p.w*0.5)), p.y-6)); }
   }
 
   // ========================= Input =========================
